@@ -10,6 +10,7 @@ var connectingElement = document.querySelector('.connecting');
 
 var stompClient = null;
 var username = null;
+var chatId = null;
 
 var colors = [
     '#2196F3', '#32c787', '#00BCD4', '#ff5652',
@@ -18,6 +19,7 @@ var colors = [
 
 function connect(event) {
     username = document.querySelector('#name').value.trim();
+    chatId = document.querySelector('#chatId').value.trim() || generateUUID();
 
     if(username) {
         usernamePage.classList.add('hidden');
@@ -27,10 +29,24 @@ function connect(event) {
         stompClient = Stomp.over(socket);
 
         stompClient.connect({}, onConnected, onError);
+
+        stompClient.subscribe(`/topic/chat/${chatId}`, onMessageReceived);
+
+        stompClient.send(`/app/chat.addUser/${chatId}`,
+            {},
+            JSON.stringify({
+                sender: username,
+                type: 'JOIN',
+                chatId: chatId
+            })
+        );
     }
     event.preventDefault();
 }
 
+function generateUUID() {
+    return 'chat-' + Math.random().toString(36).substr(2, 9);
+}
 
 function onConnected() {
     // Subscribe to the Public Topic
@@ -55,12 +71,19 @@ function onError(error) {
 function sendMessage(event) {
     var messageContent = messageInput.value.trim();
     if(messageContent && stompClient) {
+        // var chatMessage = {
+        //     sender: username,
+        //     content: messageInput.value,
+        //     type: 'CHAT'
+        // };
+        // stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
         var chatMessage = {
             sender: username,
             content: messageInput.value,
-            type: 'CHAT'
+            type: 'CHAT',
+            chatId: chatId
         };
-        stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
+        stompClient.send(`/app/chat.sendMessage/${chatId}`, {}, JSON.stringify(chatMessage));
         messageInput.value = '';
     }
     event.preventDefault();
